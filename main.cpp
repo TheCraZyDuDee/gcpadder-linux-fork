@@ -50,7 +50,6 @@ struct Config {
   std::string port;
 };
 
-// Helper to trim whitespace from both ends
 std::string trim(const std::string& s) {
   auto start = s.begin();
   while (start != s.end() && std::isspace(*start)) ++start;
@@ -65,7 +64,6 @@ Config load_config() {
   if (file.is_open()) {
     std::string line;
     while (std::getline(file, line)) {
-      // Remove carriage return if present (Windows)
       if (!line.empty() && line.back() == '\r') line.pop_back();
       if (line.find("IP=") == 0) {
         cfg.ip = trim(line.substr(3));
@@ -121,17 +119,13 @@ int resolve_helper(const char* hostname, int family, const char* service,
     memcpy(pAddr, result_list->ai_addr, result_list->ai_addrlen);
     freeaddrinfo(result_list);
   }
-
   return result;
 }
 
 int main(int argc, char* argv[]) {
   int result = 0;
-  int fd;
-  int rc = 1;
   int sock = socket(AF_INET, SOCK_DGRAM, 0);
 
-  // --- Load or prompt for configuration ---
   Config config = load_config();
   if (config.ip.empty()) {
     config = prompt_user();
@@ -167,26 +161,28 @@ int main(int argc, char* argv[]) {
   absry.minimum = -100;
   absry.maximum = 100;
   absry.resolution = 0;
-  struct input_absinfo abslt;
-  abslt.flat = 0;
-  abslt.fuzz = 0;
-  abslt.value = 0;
-  abslt.minimum = 0;
-  abslt.maximum = 210;
-  abslt.resolution = 0;
-  struct input_absinfo absrt;
-  absrt.flat = 0;
-  absrt.fuzz = 0;
-  absrt.value = 0;
-  absrt.minimum = 0;
-  absrt.maximum = 210;
-  absrt.resolution = 0;
+
+  struct input_absinfo absz;
+  absz.flat = 0;
+  absz.fuzz = 0;
+  absz.value = 0;
+  absz.minimum = 0;
+  absz.maximum = 200;
+  absz.resolution = 0;
+  struct input_absinfo absrz;
+  absrz.flat = 0;
+  absrz.fuzz = 0;
+  absrz.value = 0;
+  absrz.minimum = 0;
+  absrz.maximum = 200;
+  absrz.resolution = 0;
 
   struct libevdev* dev = libevdev_new();
   struct libevdev_uinput* uidev;
   libevdev_set_name(dev, "Nintendo GameCube Controller");
 
   libevdev_enable_event_type(dev, EV_ABS);
+
   libevdev_enable_event_code(dev, EV_ABS, ABS_X, &absx);
   libevdev_set_abs_info(dev, ABS_X, &absx);
   libevdev_enable_event_code(dev, EV_ABS, ABS_Y, &absy);
@@ -195,26 +191,29 @@ int main(int argc, char* argv[]) {
   libevdev_set_abs_info(dev, ABS_RX, &absrx);
   libevdev_enable_event_code(dev, EV_ABS, ABS_RY, &absry);
   libevdev_set_abs_info(dev, ABS_RY, &absry);
-  libevdev_enable_event_code(dev, EV_ABS, ABS_HAT1X, &absrt);
-  libevdev_set_abs_info(dev, ABS_HAT1X, &absrt);
-  libevdev_enable_event_code(dev, EV_ABS, ABS_HAT1Y, &abslt);
-  libevdev_set_abs_info(dev, ABS_HAT1Y, &abslt);
+
+  libevdev_enable_event_code(dev, EV_ABS, ABS_Z, &absz);
+  libevdev_set_abs_info(dev, ABS_Z, &absz);
+  libevdev_enable_event_code(dev, EV_ABS, ABS_RZ, &absrz);
+  libevdev_set_abs_info(dev, ABS_RZ, &absrz);
 
   libevdev_enable_event_type(dev, EV_KEY);
+
   libevdev_enable_event_code(dev, EV_KEY, BTN_SOUTH, NULL);
   libevdev_enable_event_code(dev, EV_KEY, BTN_EAST, NULL);
   libevdev_enable_event_code(dev, EV_KEY, BTN_NORTH, NULL);
   libevdev_enable_event_code(dev, EV_KEY, BTN_WEST, NULL);
-  libevdev_enable_event_code(dev, EV_KEY, BTN_TR2, NULL); // Previously BTN_Z
-  libevdev_enable_event_code(dev, EV_KEY, BTN_TL, NULL);
+
   libevdev_enable_event_code(dev, EV_KEY, BTN_TR, NULL);
+
+  libevdev_enable_event_code(dev, EV_KEY, BTN_TL2, NULL);
+  libevdev_enable_event_code(dev, EV_KEY, BTN_TR2, NULL);
+
   libevdev_enable_event_code(dev, EV_KEY, BTN_START, NULL);
   libevdev_enable_event_code(dev, EV_KEY, BTN_DPAD_UP, NULL);
   libevdev_enable_event_code(dev, EV_KEY, BTN_DPAD_DOWN, NULL);
   libevdev_enable_event_code(dev, EV_KEY, BTN_DPAD_LEFT, NULL);
   libevdev_enable_event_code(dev, EV_KEY, BTN_DPAD_RIGHT, NULL);
-
-  std::cout << absx.maximum << "\n";
 
   result = libevdev_uinput_create_from_device(dev, LIBEVDEV_UINPUT_OPEN_MANAGED,
                                               &uidev);
@@ -250,7 +249,7 @@ int main(int argc, char* argv[]) {
 
   std::cout << result << " bytes sent" << std::endl;
 
-  uint16_t prevButtons = 0xFFFF;   // start with a value that's never equal to real data
+  uint16_t prevButtons = 0xFFFF;
 
   while (true) {
     result = recv(sock, &paddata, 8, 0);
@@ -260,7 +259,6 @@ int main(int argc, char* argv[]) {
       exit(1);
     }
 
-    // Only print when the button state actually changes
     if (paddata.buttons != prevButtons) {
       std::cout << "Buttons: " << paddata.buttons << "\n";
       prevButtons = paddata.buttons;
@@ -270,22 +268,22 @@ int main(int argc, char* argv[]) {
     libevdev_uinput_write_event(uidev, EV_ABS, ABS_Y, -paddata.stickY);
     libevdev_uinput_write_event(uidev, EV_ABS, ABS_RX, paddata.substickX);
     libevdev_uinput_write_event(uidev, EV_ABS, ABS_RY, -paddata.substickY);
-    libevdev_uinput_write_event(uidev, EV_ABS, ABS_HAT1X, paddata.triggerR);
-    libevdev_uinput_write_event(uidev, EV_ABS, ABS_HAT1Y, paddata.triggerL);
+    libevdev_uinput_write_event(uidev, EV_ABS, ABS_Z, paddata.triggerL);
+    libevdev_uinput_write_event(uidev, EV_ABS, ABS_RZ, paddata.triggerR);
 
     libevdev_uinput_write_event(uidev, EV_KEY, BTN_SOUTH,
                                 (paddata.buttons & A) == A ? 1 : 0);
     libevdev_uinput_write_event(uidev, EV_KEY, BTN_EAST,
-                                (paddata.buttons & B) == B ? 1 : 0); // Previously X
+                                (paddata.buttons & B) == B ? 1 : 0);
     libevdev_uinput_write_event(uidev, EV_KEY, BTN_NORTH,
-                                (paddata.buttons & X) == X ? 1 : 0); // Previously Y
+                                (paddata.buttons & X) == X ? 1 : 0);
     libevdev_uinput_write_event(uidev, EV_KEY, BTN_WEST,
-                                (paddata.buttons & Y) == Y ? 1 : 0); // Previously B
-    libevdev_uinput_write_event(uidev, EV_KEY, BTN_TR2,              // Previously BTN_Z
-                                (paddata.buttons & Z) == Z ? 1 : 0);
-    libevdev_uinput_write_event(uidev, EV_KEY, BTN_TL,
-                                (paddata.buttons & TRIG_L) == TRIG_L ? 1 : 0);
+                                (paddata.buttons & Y) == Y ? 1 : 0);
     libevdev_uinput_write_event(uidev, EV_KEY, BTN_TR,
+                                (paddata.buttons & Z) == Z ? 1 : 0);
+    libevdev_uinput_write_event(uidev, EV_KEY, BTN_TL2,
+                                (paddata.buttons & TRIG_L) == TRIG_L ? 1 : 0);
+    libevdev_uinput_write_event(uidev, EV_KEY, BTN_TR2,
                                 (paddata.buttons & TRIG_R) == TRIG_R ? 1 : 0);
     libevdev_uinput_write_event(uidev, EV_KEY, BTN_START,
                                 (paddata.buttons & START) == START ? 1 : 0);
