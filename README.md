@@ -1,7 +1,7 @@
 # gcpadder-linux-fork
 
 Lazy Fork that is mostly vibe coded and only changes a few things for my own convenience.<br>
-I barely do stuff myself on it due to my lack of C++ knowledge so i let AI do the coding and adjust things in post.
+I barely do stuff myself on it due to my lack of C++ knowledge so i let AI do the coding and adjust things personally in post when able to.
 
 TL;DR: If you are against using AI code do not use this.
 
